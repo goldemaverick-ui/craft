@@ -29,6 +29,7 @@ function sanitizeContext(ctx: ErrorContext): ErrorContext {
         ...(ctx.url !== undefined && { url: sanitizeString(ctx.url) }),
         ...(ctx.code !== undefined && { code: sanitizeString(ctx.code) }),
         ...(ctx.userAgent !== undefined && { userAgent: sanitizeString(ctx.userAgent) }),
+        ...(ctx.stackTrace !== undefined && { stackTrace: sanitizeString(ctx.stackTrace) }),
     };
 }
 

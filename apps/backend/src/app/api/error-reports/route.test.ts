@@ -112,4 +112,24 @@ describe('POST /api/error-reports', () => {
         const res = await POST(req, { params: {} });
         expect(res.status).toBe(500);
     });
+
+    it('returns 400 when stack trace exceeds 50KB', async () => {
+        const oversizedStackTrace = 'x'.repeat(51201);
+        const req = makeRequest({
+            description: 'Stack overflow',
+            errorContext: { message: 'error', stackTrace: oversizedStackTrace },
+        });
+        const res = await POST(req, { params: {} });
+        expect(res.status).toBe(400);
+    });
+
+    it('accepts stack trace up to 50KB', async () => {
+        const maxStackTrace = 'x'.repeat(51200);
+        const req = makeRequest({
+            description: 'Max stack trace',
+            errorContext: { message: 'error', stackTrace: maxStackTrace },
+        });
+        const res = await POST(req, { params: {} });
+        expect(res.status).toBe(201);
+    });
 });

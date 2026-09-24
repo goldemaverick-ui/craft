@@ -13,6 +13,7 @@ const submitSchema = z.object({
         code: z.string().max(128).optional(),
         url: z.string().url().optional(),
         userAgent: z.string().max(500).optional(),
+        stackTrace: z.string().max(51200).optional(),
     }),
 });
 

@@ -24,6 +24,8 @@ export interface ErrorContext {
     url?: string;
     /** Browser / user-agent string. */
     userAgent?: string;
+    /** Stack trace (capped at 50KB). */
+    stackTrace?: string;
 }
 
 export interface SubmitErrorReportRequest {
