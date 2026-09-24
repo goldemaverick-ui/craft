@@ -455,3 +455,97 @@ describe('PATCH /api/deployments/[id]/repository', () => {
         expect(res.status).toBe(500);
     });
 });
+
+describe('GET /api/deployments/[id]/repository', () => {
+    const mockGetRepositoryMetadata = vi.fn();
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockGetUser.mockResolvedValue({ data: { user: fakeUser }, error: null });
+        vi.doMock('@/services/github.service', () => ({
+            githubService: {
+                getRepositoryMetadata: mockGetRepositoryMetadata,
+            },
+        }));
+    });
+
+    function makeGetRequest() {
+        return new NextRequest('http://localhost/api/deployments/dep-1/repository', {
+            method: 'GET',
+        });
+    }
+
+    it('returns 200 with repository metadata for owner', async () => {
+        const metadata = {
+            defaultBranch: 'main',
+            visibility: 'private',
+            lastCommitSha: 'abc123',
+            lastCommitMessage: 'feat: update',
+            lastCommitDate: '2025-01-01T00:00:00Z',
+        };
+        mockFrom.mockReturnValue(
+            makeSupabaseQuery([
+                { data: { repository_url: 'https://github.com/user/repo.git', user_id: fakeUser.id }, error: null },
+            ]),
+        );
+        mockGetRepositoryMetadata.mockResolvedValue(metadata);
+        const { GET } = await import('./route');
+
+        const res = await GET(makeGetRequest(), { params });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.defaultBranch).toBe('main');
+        expect(body.visibility).toBe('private');
+    });
+
+    it('returns 404 when deployment not owned by caller', async () => {
+        mockFrom.mockReturnValue(
+            makeSupabaseQuery([
+                { data: { repository_url: 'https://github.com/user/repo.git', user_id: 'other-user' }, error: null },
+            ]),
+        );
+        const { GET } = await import('./route');
+
+        const res = await GET(makeGetRequest(), { params });
+
+        expect(res.status).toBe(404);
+        const body = await res.json();
+        expect(body.error).toContain('not found');
+    });
+
+    it('returns 404 when deployment not found', async () => {
+        mockFrom.mockReturnValue(
+            makeSupabaseQuery([
+                { data: null, error: { message: 'not found' } },
+            ]),
+        );
+        const { GET } = await import('./route');
+
+        const res = await GET(makeGetRequest(), { params });
+
+        expect(res.status).toBe(404);
+    });
+
+    it('returns 404 when repository not linked', async () => {
+        mockFrom.mockReturnValue(
+            makeSupabaseQuery([
+                { data: { repository_url: null, user_id: fakeUser.id }, error: null },
+            ]),
+        );
+        const { GET } = await import('./route');
+
+        const res = await GET(makeGetRequest(), { params });
+
+        expect(res.status).toBe(404);
+    });
+
+    it('returns 401 when unauthenticated', async () => {
+        mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+        const { GET } = await import('./route');
+
+        const res = await GET(makeGetRequest(), { params });
+
+        expect(res.status).toBe(401);
+    });
+});

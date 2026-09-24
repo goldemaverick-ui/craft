@@ -34,6 +34,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withDeploymentAuth } from '@/lib/api/with-auth';
+import { withAuth } from '@/lib/api/with-auth';
+import { createClient } from '@/lib/supabase/server';
 import { githubService } from '@/services/github.service';
 import { githubRepositoryUpdateService } from '@/services/github-repository-update.service';
 
@@ -72,6 +74,59 @@ function normalizeRequestBody(raw: unknown): RequestBody | null {
 
     return body as RequestBody;
 }
+
+/**
+ * GET /api/deployments/[id]/repository
+ *
+ * Retrieves repository metadata for a deployment's linked GitHub repository.
+ * Enforces deployment ownership check (not just authentication).
+ *
+ * Authentication & ownership:
+ *   Requires a valid session (401) and ownership of the deployment (404).
+ *
+ * Responses:
+ *   200 — Repository metadata retrieved
+ *         { defaultBranch, visibility, lastCommitSha, lastCommitMessage, lastCommitDate }
+ *   401 — Not authenticated
+ *   404 — Deployment not found or not owned by caller
+ *   500 — Unexpected error (GitHub API failure, etc.)
+ */
+export const GET = withAuth(async (req: NextRequest, { user, supabase, params }) => {
+    const deploymentId = params.id;
+
+    const { data: deployment, error: fetchError } = await supabase
+        .from('deployments')
+        .select('repository_url, user_id')
+        .eq('id', deploymentId)
+        .single();
+
+    if (fetchError || !deployment) {
+        return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
+    }
+
+    if (deployment.user_id !== user.id) {
+        return NextResponse.json({ error: 'Deployment not found' }, { status: 404 });
+    }
+
+    if (!deployment.repository_url) {
+        return NextResponse.json({ error: 'Repository not linked to deployment' }, { status: 404 });
+    }
+
+    try {
+        const url = new URL(deployment.repository_url);
+        const [owner, repo] = url.pathname.replace('.git', '').split('/').slice(-2);
+
+        const metadata = await githubService.getRepositoryMetadata(owner, repo);
+
+        return NextResponse.json(metadata, { status: 200 });
+    } catch (err: any) {
+        console.error('Failed to fetch repository metadata:', err);
+        return NextResponse.json(
+            { error: 'Failed to fetch repository metadata' },
+            { status: 500 }
+        );
+    }
+});
 
 export const POST = withDeploymentAuth(async (req: NextRequest, { params, supabase, user }) => {
     const deploymentId = params.id;
