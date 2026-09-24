@@ -2,27 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/api/with-auth';
 import { validateCustomizationConfig } from '@/lib/customization/validate';
 import { previewService } from '@/services/preview.service';
-<<<<<<< HEAD
-import { costEstimationService, PricingTier } from '@/services/billing/cost-estimation.service';
-=======
 import { costEstimationService } from '@/services/billing/cost-estimation.service';
->>>>>>> d855263 (feat(cost-estimation): implement deployment cost estimation and complexity scoring)
 import type { CustomizationConfig, DeepPartial } from '@craft/types';
-
-function mapSubscriptionTier(tier?: string): PricingTier {
-    if (tier === 'pro') return 'standard';
-    if (tier === 'enterprise') return 'premium';
-    return 'basic';
-}
 
 /**
  * POST /api/preview/update
  * Updates preview with partial customization changes.
- * Expects { current, changes } where changes is DeepPartial<CustomizationConfig>.
+ * Expects { current, changes, sequence? } where changes is DeepPartial<CustomizationConfig>.
  * Returns minimal update payload with changedFields and optional mockData.
+ * sequence is used to reject out-of-order updates (returned as 204 if stale).
  */
 export const POST = withAuth(async (req: NextRequest, { user, supabase }) => {
-    let body: { current?: unknown; changes?: unknown };
+    let body: { current?: unknown; changes?: unknown; sequence?: number };
     try {
         body = await req.json();
     } catch {
@@ -50,25 +41,6 @@ export const POST = withAuth(async (req: NextRequest, { user, supabase }) => {
 
     try {
         const payload = previewService.updatePreview(current, changes);
-<<<<<<< HEAD
-
-        // Fetch user profile to get subscription tier
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('subscription_tier')
-            .eq('id', user.id)
-            .single();
-
-        const pricingTier = mapSubscriptionTier(profile?.subscription_tier);
-        const estimatedCost = costEstimationService.calculateComplexityScore(
-            payload.customization,
-            pricingTier
-        );
-
-        return NextResponse.json({
-            ...payload,
-            estimatedCost
-=======
         const estimate = costEstimationService.estimateDeploymentCost({
             customizationConfig: payload.customization,
         });
@@ -77,7 +49,6 @@ export const POST = withAuth(async (req: NextRequest, { user, supabase }) => {
             ...payload,
             estimate,
             costEstimate: estimate,
->>>>>>> d855263 (feat(cost-estimation): implement deployment cost estimation and complexity scoring)
         }, { status: 200 });
     } catch (error: any) {
         return NextResponse.json(

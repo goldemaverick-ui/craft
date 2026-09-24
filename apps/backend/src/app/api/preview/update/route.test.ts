@@ -214,4 +214,21 @@ describe('POST /api/preview/update', () => {
         const json = await res.json();
         expect(new Date(json.timestamp).toString()).not.toBe('Invalid Date');
     });
+
+    it('accepts preview update with sequence parameter', async () => {
+        const changes = { branding: { appName: 'Current' } };
+
+        const res = await POST(
+            post('http://localhost/api/preview/update', {
+                current: validConfig,
+                changes,
+                sequence: 1
+            }),
+            { params: {} }
+        );
+
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.customization.branding.appName).toBe('Current');
+    });
 });
