@@ -283,7 +283,6 @@ export class DeploymentUpdateService {
             status: 'pending',
             canary_percent: 0,
             created_at: new Date().toISOString(),
-            canary_percent: 0,
         });
     }
 

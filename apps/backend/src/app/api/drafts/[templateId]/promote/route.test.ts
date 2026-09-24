@@ -131,4 +131,33 @@ describe('POST /api/drafts/[templateId]/promote', () => {
         const res = await POST(makeRequest({ deploymentId }), { params });
         expect(res.status).toBe(500);
     });
+
+    it('can retry promotion after mid-promotion failure', async () => {
+        const failureResult = {
+            success: false,
+            deploymentId,
+            rolledBack: true,
+            errorMessage: 'GitHub push failed, deployment rolled back',
+        };
+        const retryResult = {
+            success: true,
+            deploymentId,
+            rolledBack: false,
+            deploymentUrl: 'https://my-dex.vercel.app',
+        };
+
+        mockPromoteDraft.mockResolvedValueOnce(failureResult);
+        const { POST } = await import('./route');
+        let res = await POST(makeRequest({ deploymentId }), { params });
+        expect(res.status).toBe(500);
+
+        mockPromoteDraft.mockResolvedValueOnce(retryResult);
+        res = await POST(makeRequest({ deploymentId }), { params });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.success).toBe(true);
+        expect(mockPromoteDraft).toHaveBeenCalledTimes(2);
+        expect(mockPromoteDraft).toHaveBeenNthCalledWith(1, fakeUser.id, templateId, deploymentId);
+        expect(mockPromoteDraft).toHaveBeenNthCalledWith(2, fakeUser.id, templateId, deploymentId);
+    });
 });
